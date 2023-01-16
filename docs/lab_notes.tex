@@ -6,6 +6,7 @@
 \usepackage{graphicx}
 \usepackage{geometry}
 \usepackage{amsfonts}
+\usepackage{hyperref}
 
 \definecolor{azulUC3M}{RGB}{0,0,102}
 
@@ -96,7 +97,7 @@ AES256 is a \textbf{block cypher algorithm} with a 32B key, and it can use diffe
     
     message = b"A secret message"  # must be binary
 
-    cypher = Cypher(algorithms.AES(key), <mode>)
+    cypher = Cypher(algorithms.AES(key), mode = <mode>)
 
     encryptor = cypher.encryptor()
     ct = encryptor.update(message) + encryptor.finalize
@@ -118,6 +119,7 @@ Padding is required.
 \end{lstlisting}
 
 \subsection{CTR mode}
+\label{sec:AES256 CTR}
 Requires a nonce (unique and never reused). This mode is not reccomended for block cyphers with a block size of less than 128b.
 \begin{lstlisting}[language=Python]
     cypher = Cypher(algorithms.AES(key), modes.CTR(nonce))
@@ -142,5 +144,128 @@ ChaCha20 is a \textbf{stream cypher algorithm}. It requires a 32B key and a 16B 
     decryptor = cipher.decryptor()
     pt = decryptor.update(ct)
 \end{lstlisting}
+
+
+\chapter{Assymetric encrytption}
+
+\section{RSA}
+
+\subsection{RSA key generation}
+\begin{lstlisting}[language=Python]
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    key_size = 2048
+    public_exponent = 65537
+    
+    priv_key = rsa.generate_private_key(
+        public_exponent,key_size
+    )
+
+    pub_key = priv_key.public_key()
+\end{lstlisting}
+
+We can obtaint the numbers from the key pair:
+\begin{lstlisting}[language=Python]
+    u = pub_key.public_numbers()
+    e = u.e
+    n = u.n
+
+    v = priv_key.private_numbers()
+    p = v.p
+    q = v.q
+    d = v.d
+\end{lstlisting}
+
+\subsection{PEM serialization}
+To output the key pair in PEM format:
+\begin{lstlisting}[language=Python]
+    from cryptography.hazmat.primitives.serialization \
+    import load_pem_private_key, load_pem_public_key
+    from cryptography.hazmat.primitives import serialization
+    
+    encoding = serialization.Encoding.PEM
+
+    # public key
+    format = serialization.PublicFormat.SubjectPublicKeyInfo
+    pem_pub_key = pub_key.public_bytes(encoding, format)
+    
+    # private key
+    format = serialization.PrivateFormat.TraditionalOpenSSL
+    
+    pwd = b"password"  # e.g.
+    encryption_algorithm = serialization.BestAvailableEncryption(pwd)
+
+    pem_priv_key = priv_key.private_bytes(
+        encoding, format, encryption_algorithm
+    )
+\end{lstlisting}
+
+You can deserialize a serialized PEM key with:
+\begin{lstlisting}[language=Python]
+    pub_key = load_pem_public_key(pem_pub_key)
+    priv_key = load_pem_private_key(pem_priv_key, pwd)
+    
+\end{lstlisting}
+
+\subsection{RSA encryption/decryption (with padding)}
+\begin{lstlisting}[language=Python]
+    padder = padding.PKSC1v15()
+
+    ct = public_key.encrypt(message, padder)
+    
+    pt = public_key.decrypt(message, padder)
+\end{lstlisting}
+
+For OAEP padding, we need to set the padder as:
+\begin{lstlisting}
+    padder = padding.OAEP(
+        mgf = padding.MGF1(
+            algorithms.hashes.SHA256()
+        ),
+        algorithm = hashes.SHA256(),
+        label = None
+    )
+\end{lstlisting}
+
+Note that encrypting the same message won't give the same cyphertext when using PKCS1v15 and OAEP padding, as there is a random bytes string appended.
+
+\chapter{Hybrid encryption (RSA OAEP + AES256 CTR)}
+\begin{enumerate}
+    \item Encrypt the symmetric AES key with the public RSA key and add padding.
+    \begin{lstlisting}[language=Python]
+        encrypted_sym_key = pub_key.encrypt(key, padder)
+    \end{lstlisting}
+    \item Generate a nonce.
+    \begin{lstlisting}[language=Python]
+        nonce = os.urandom(block_size)
+    \end{lstlisting}
+    \item Encrypt with AES in CTR mode
+    \hyperref[sec:AES256 CTR]{(see AES256 CTR)}.
+\end{enumerate}
+
+To decrypt: 
+\begin{enumerate}
+    \item Decrypt and unpad the AES key with the private RSA key.
+    \begin{lstlisting}[language=Python]
+        key = priv_key.decrypt(encrypted_key, padder)
+    \end{lstlisting}
+    \item Decrypt the cyphertext with AES in CTR mode
+    \hyperref[sec:AES256 CTR]{(see AES256 CTR)}.
+\end{enumerate}
+
+
+\chapter{Key exchange}
+
+\subsection{AES key wrapping}
+Key wrapping is encrypting a symmetric key using another symmetric key in order to transmit it through an untrusted channel.
+
+\begin{lstlisting}[language=Python]
+from cryptography.hazmat.primitives.keywrap \
+    import aes_key_wrap, aes_key_unwrap
+
+    wrapped_key = aes_key_wrap(wrapping_key, key)
+    key = aes_key_unwrap(wrapping_key, wrapped_key)
+\end{lstlisting}
+
 
 \end{document}
