@@ -1,0 +1,146 @@
+\documentclass[a4paper, 12 pt]{memoir}
+\usepackage[utf8]{inputenc}
+\usepackage[table]{xcolor}
+\usepackage{listings}
+\usepackage{float} 
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{amsfonts}
+
+\definecolor{azulUC3M}{RGB}{0,0,102}
+
+\geometry{asymmetric}
+
+\begin{document}
+
+\chapter{General knowledge}
+
+\section{Converting data}
+
+\subsection{Binary to hexadecimal}
+Use python built-in functions.
+\begin{lstlisting}[language=Python]
+    bin_data = b"data"
+    hex_data = bin_data.hex()
+    bin_data = bytes.fromhex(hex_data)
+\end{lstlisting}
+
+\subsection{Binary to base 64}
+Use python module \textbf{base64}.
+\begin{lstlisting}[language=Python]
+    import base64
+
+    bin_data = b"data"
+    b64_data = base64.b64encode(bin_data)
+    bin_data = base64.b64decode(b64_data)
+\end{lstlisting}
+
+\section{PKCS7 Padding}
+Some block cyphers might require padding. The order of operation must always be:
+\begin{enumerate}
+    \item Pad data
+    \item Encrypt padded data
+    \item Exchange data
+    \item Decrypt encrypted data
+    \item Unpad plaintext
+\end{enumerate}
+
+\begin{lstlisting}[language=Python]
+    from cryptography.hazmat.primitives import padding
+
+    padder = padding.PKCS7(block_size).padder()
+    padded_data = padder.update(data) + padder.finalize()
+
+    unpadder = padding.PKCS7(block_size).unpadder()
+    data = unpadder.update(padded_data) + unpadder.finalize()
+
+\end{lstlisting}
+
+
+\section{Randomization}
+\subsection{Random keystream}
+You can generate a random string of bytes by using an OS function.
+
+\begin{lstlisting}[language=Python]
+    import os
+
+    rand = os.urandom(num_bytes)
+\end{lstlisting}
+
+\subsection{LFSR keystream}
+This is included in the \textbf{pylfsr} module.
+\begin{lstlisting}[language=Python]
+    from pylfsr import LFSR
+
+    seed = [0, 0, 0, 1, 0]
+    fpoly = [3, 2, 1]  # c3=1, c2=1, c1=1
+    L = LFSR(fpoly = fpoly, initstate = seed, verbose = True)
+
+    seq = L.runKCycle(num_bits)
+\end{lstlisting}
+
+
+\chapter{Symmetric encryption}
+
+\section{AES256}
+AES256 is a \textbf{block cypher algorithm} with a 32B key, and it can use different modes of operation. The general syntax is:
+
+\begin{lstlisting}[language=Python]
+    from cryptography.hazmat.primitives.ciphers \
+        import Cipher, algorithms, modes
+
+    block_size = 16  # e.g.
+    key = os.urandom(32)
+    iv = os.urandom(block_size)  # if needed, depends on mode
+    nonce = os.urandom(block_size)  # if needed, depends on mode
+    
+    message = b"A secret message"  # must be binary
+
+    cypher = Cypher(algorithms.AES(key), <mode>)
+
+    encryptor = cypher.encryptor()
+    ct = encryptor.update(message) + encryptor.finalize
+
+    decryptor = cypher.decryptor()
+    pt = decryptor.update(ct) + decryptor.finalize
+\end{lstlisting}
+
+\subsection{CBC mode}
+Needs an Initialization Vector.
+\begin{lstlisting}[language=Python]
+    cypher = Cypher(algorithms.AES(key), modes.CBC(iv))
+\end{lstlisting}
+
+\subsection{ECB mode}
+Padding is required.
+\begin{lstlisting}[language=Python]
+    cypher = Cypher(algorithms.AES(key), modes.ECB())
+\end{lstlisting}
+
+\subsection{CTR mode}
+Requires a nonce (unique and never reused). This mode is not reccomended for block cyphers with a block size of less than 128b.
+\begin{lstlisting}[language=Python]
+    cypher = Cypher(algorithms.AES(key), modes.CTR(nonce))
+\end{lstlisting}
+
+\subsection{Effects of modifying ciphertexts in different modes}
+\begin{itemize}
+    \item \textbf{CBC and ECB modes:} The entire block of the altered byte is corrupted.
+    \item \textbf{CTR mode:} Only the affected byte is corrupted.
+\end{itemize}
+
+\section{ChaCha20}
+ChaCha20 is a \textbf{stream cypher algorithm}. It requires a 32B key and a 16B nonce.
+\begin{lstlisting}[language=Python]
+    nonce = os.urandom(16)
+
+    cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None)
+
+    encryptor = cipher.encryptor()
+    ct = encryptor.update(message)
+    
+    decryptor = cipher.decryptor()
+    pt = decryptor.update(ct)
+\end{lstlisting}
+
+\end{document}
