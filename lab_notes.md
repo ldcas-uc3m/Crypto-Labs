@@ -21,7 +21,7 @@ bin_data = base64.b64decode(b64_data)
 ```
 
 ## PKCS7 Padding
-Some block cyphers might require padding. The order of operation must always be:
+Some block cyphers might require padding if the message is not a multiple of the block size. The order of operation must always be:
 1. Pad data
 2. Encrypt padded data
 3. Exchange data
@@ -31,10 +31,12 @@ Some block cyphers might require padding. The order of operation must always be:
 ```python
 from cryptography.hazmat.primitives import padding
 
-padder = padding.PKCS7(block_size).padder()
+BLOCK_SIZE = 16  # Bytes
+
+padder = padding.PKCS7(BLOCK_SIZE * 8).padder()  # the padding is specified in bits
 padded_data = padder.update(data) + padder.finalize()
 
-unpadder = padding.PKCS7(block_size).unpadder()
+unpadder = padding.PKCS7(BLOCK_SIZE * 8).unpadder()
 data = unpadder.update(padded_data) + unpadder.finalize()
 
 ```
@@ -42,12 +44,18 @@ data = unpadder.update(padded_data) + unpadder.finalize()
 
 ## Randomization
 ### Random keystream
-You can generate a random string of bytes by using an OS function.
+You can generate a random string of bytes by using an OS function, or a specialized library, `secrets`.
 
 ```python
 import os
 
 rand = os.urandom(num_bytes)
+```
+
+```python
+import secrets
+
+rand = secrets.token_bytes(num_bytes)
 ```
 
 ### LFSR keystream
@@ -64,64 +72,84 @@ This is included in the **pylfsr** module.
 
 
 # Symmetric encryption
-
-## AES256
-AES256 is a **block cypher algorithm** with a 32B key, and it can use different modes of operation. The general syntax is:
+The general syntax is:
 
 ```python
 from cryptography.hazmat.primitives.ciphers \
     import Cipher, algorithms, modes
 
-block_size = 16  # e.g.
-key = os.urandom(32)
-iv = os.urandom(block_size)  # if needed, depends on mode
-nonce = os.urandom(block_size)  # if needed, depends on mode
+key = os.urandom(KEY_SIZE)
+iv = os.urandom(BLOCK_SIZE)  # if needed
+nonce = os.urandom(BLOCK_SIZE)  # if needed
 
 message = b"A secret message"  # must be binary
 
-cypher = Cypher(algorithms.AES(key), mode = <mode>)
+cipher = Cipher(algorithm, mode)
 
+# encrypt
 encryptor = cypher.encryptor()
-ct = encryptor.update(message) + encryptor.finalize
+ct = encryptor.update(message) + encryptor.finalize()
 
+# decrypt
 decryptor = cypher.decryptor()
-pt = decryptor.update(ct) + decryptor.finalize
+pt = decryptor.update(ct) + decryptor.finalize()
 ```
+
+## AES-256
+AES-256 is a **block cypher algorithm** with a **32B key**, and **16B block size**. It can use different modes of operation. 
+
+```python
+KEY_SIZE = 32  # Bytes
+BLOCK_SIZE = 16  # Bytes
+```
+```python
+cipher = Cipher(algorithms.AES256(key), mode = <mode>)
+```
+
+
+## Camellia-256
+It's a **block cypher** with **32B keys**, no padding required.
+```python
+KEY_SIZE = 32  # Bytes
+```
+```python
+cipher = Cipher(algorithms.Camellia(key), mode = <mode>)
+```
+
+## Block cipher modes
+Block ciphers have different execution modes:
 
 ### CBC mode
-Needs an Initialization Vector.
+Needs an Initialization Vector (16B, same as the block size), and padding.
 ```python
-cypher = Cypher(algorithms.AES(key), modes.CBC(iv))
+cipher = Cipher(algorithms.AES256(key), modes.CBC(iv))
 ```
 
-### ECB mode}
+### ECB mode
 Padding is required.
 ```python
-cypher = Cypher(algorithms.AES(key), modes.ECB())
+cipher = Cipher(algorithms.AES256(key), modes.ECB())
 ```
 
 ### CTR mode
 Requires a nonce (unique and never reused). This mode is not reccomended for block cyphers with a block size of less than 128b.
 ```python
-cypher = Cypher(algorithms.AES(key), modes.CTR(nonce))
+cipher = Cipher(algorithms.AES256(key), modes.CTR(nonce))
 ```
 
 ### Effects of modifying ciphertexts in different modes
 - **CBC and ECB modes:** The entire block of the altered byte is corrupted.
 - **CTR mode:** Only the affected byte is corrupted.
 
+
 ## ChaCha20
-ChaCha20 is a **stream cypher algorithm**. It requires a 32B key and a 16B nonce.
+ChaCha20 is a **stream cipher algorithm**. It requires a **32B key** and a **16B nonce**.
 ```python
-nonce = os.urandom(16)
-
-cipher = Cipher(algorithms.ChaCha20(key, nonce), mode=None)
-
-encryptor = cipher.encryptor()
-ct = encryptor.update(message)
-
-decryptor = cipher.decryptor()
-pt = decryptor.update(ct)
+KEY_SIZE = 32  # Bytes
+BLOCK_SIZE = 16  # Bytes
+```
+```python
+cipher = Cipher(algorithms.ChaCha20(key, nonce), mode = None)
 ```
 
 
@@ -215,7 +243,7 @@ Note that encrypting the same message won't give the same cyphertext when using 
     ```
 2. Generate a nonce.
     ```python
-    nonce = os.urandom(block_size)
+    nonce = os.urandom(BLOCK_SIZE)
     ```
 3. Encrypt with AES in CTR mode (see [AES256-CTR](#ctr-mode)).
 
