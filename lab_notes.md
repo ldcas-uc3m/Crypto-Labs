@@ -1,8 +1,6 @@
-# General knowledge
+# Converting data
 
-## Converting data
-
-### Binary to hexadecimal
+## Binary to hexadecimal
 Use python built-in functions.
 ```python
 bin_data = b"data"
@@ -10,8 +8,8 @@ hex_data = bin_data.hex()
 bin_data = bytes.fromhex(hex_data)
 ```
 
-### Binary to base 64
-Use python module \textbf{base64}.
+## Binary to base 64
+Use python module `base64`.
 ```python
 import base64
 
@@ -20,17 +18,20 @@ b64_data = base64.b64encode(bin_data)
 bin_data = base64.b64decode(b64_data)
 ```
 
-## PKCS7 Padding
-Some block cyphers might require padding if the message is not a multiple of the block size. The order of operation must always be:
+# Padding
+```python
+from cryptography.hazmat.primitives import padding
+```
+The order of operation must always be:
 1. Pad data
 2. Encrypt padded data
 3. Exchange data
 4. Decrypt encrypted data
 5. Unpad plaintext
 
+## PKCS7 padding (symmetric)
+Some block cyphers might require padding if the message is not a multiple of the block size. 
 ```python
-from cryptography.hazmat.primitives import padding
-
 BLOCK_SIZE = 16  # Bytes
 
 padder = padding.PKCS7(BLOCK_SIZE * 8).padder()  # the padding is specified in bits
@@ -41,9 +42,40 @@ data = unpadder.update(padded_data) + unpadder.finalize()
 
 ```
 
+## PKCS1v15 padding (asymmetric)
+```python
+padder = padding.PKCS1v15()
+```
+Used for **RSA signing and encryption**, but **not reccomended** for either (prefer [OAEP](#oaep-padding-asymmetric) for encryption and [PSS](#pss-padding-asymmetric) for signing).
 
-## Randomization
-### Random keystream
+## OAEP padding (asymmetric)
+```python
+from cryptography.hazmat.primitives import hashes
+```
+Used for **RSA encryption** (but not signing), and the **recommended method** to do so, at is has been proven secure.
+```python
+padder = padding.OAEP(
+    mgf = padding.MGF1(utils.hashes.SHA256()),
+    algorithm = utils.hashes.SHA256(),
+    label = None
+)
+```
+
+## PSS padding (asymmetric)
+Used for **RSA signing** (but not encryption), and the **recommended method** to do so, at is has been proven secure.
+```python
+# for signing
+padder = padding.PSS(mgf = padding.PSS.MAX_LENGTH)
+
+# for verifying
+padder = padding.PSS(
+    mgf = padding.PSS.MAX_LENGTH,
+    salt_length = padding.PSS.MAX_LENGTH
+)
+```
+
+# Randomization
+## Random keystream
 You can generate a random string of bytes by using an OS function, or a specialized library, `secrets`.
 
 ```python
@@ -58,26 +90,26 @@ import secrets
 rand = secrets.token_bytes(num_bytes)
 ```
 
-### LFSR keystream
-This is included in the **pylfsr** module.
+## LFSR keystream
 ```python
-    from pylfsr import LFSR
+from pylfsr import LFSR
+```
+```python
+seed = [0, 0, 0, 1, 0]
+fpoly = [3, 2, 1]  # c3=1, c2=1, c1=1
+L = LFSR(fpoly = fpoly, initstate = seed, verbose = True)
 
-    seed = [0, 0, 0, 1, 0]
-    fpoly = [3, 2, 1]  # c3=1, c2=1, c1=1
-    L = LFSR(fpoly = fpoly, initstate = seed, verbose = True)
-
-    seq = L.runKCycle(num_bits)
+seq = L.runKCycle(num_bits)
 ```
 
 
 # Symmetric encryption
+```python
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+```
 The general syntax is:
 
 ```python
-from cryptography.hazmat.primitives.ciphers \
-    import Cipher, algorithms, modes
-
 key = os.urandom(KEY_SIZE)
 iv = os.urandom(BLOCK_SIZE)  # if needed
 nonce = os.urandom(BLOCK_SIZE)  # if needed
@@ -87,11 +119,11 @@ message = b"A secret message"  # must be binary
 cipher = Cipher(algorithm, mode)
 
 # encrypt
-encryptor = cypher.encryptor()
+encryptor = cyiher.encryptor()
 ct = encryptor.update(message) + encryptor.finalize()
 
 # decrypt
-decryptor = cypher.decryptor()
+decryptor = cipher.decryptor()
 pt = decryptor.update(ct) + decryptor.finalize()
 ```
 
@@ -153,19 +185,19 @@ cipher = Cipher(algorithms.ChaCha20(key, nonce), mode = None)
 ```
 
 
-# Assymetric encryption (RSA)
+# Assymetric encryption (RSA-2048)
+RSA-2048 uses a **2048b key**, and we'll use the public exponent as default (more info of why [here](https://www.youtube.com/watch?v=cbGB__V8MNk)). It **requires padding**.
+```python
+KEY_SIZE = 2048  # bits
+PUBLIC_EXPONENT = 65537
+```
 
 ## RSA key generation
 ```python
 from cryptography.hazmat.primitives.asymmetric import rsa
-
-key_size = 2048
-public_exponent = 65537
-
-priv_key = rsa.generate_private_key(
-    public_exponent,key_size
-)
-
+```
+```python
+priv_key = rsa.generate_private_key(PUBLIC_EXPONENT, KEY_SIZE)
 pub_key = priv_key.public_key()
 ```
 
@@ -176,127 +208,130 @@ e = u.e
 n = u.n
 
 v = priv_key.private_numbers()
+d = v.d
 p = v.p
 q = v.q
-d = v.d
 ```
 
 ## PEM serialization
+```python
+from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
+from cryptography.hazmat.primitives import serialization
+```
 To output the key pair in PEM format:
 ```python
-from cryptography.hazmat.primitives.serialization \
-import load_pem_private_key, load_pem_public_key
-from cryptography.hazmat.primitives import serialization
-
 encoding = serialization.Encoding.PEM
 
 # public key
 format = serialization.PublicFormat.SubjectPublicKeyInfo
+
 pem_pub_key = pub_key.public_bytes(encoding, format)
 
 # private key
-format = serialization.PrivateFormat.TraditionalOpenSSL
+pwd = b"password"  # must be in Bytes
 
-pwd = b"password"  # e.g.
+format = serialization.PrivateFormat.TraditionalOpenSSL
 encryption_algorithm = serialization.BestAvailableEncryption(pwd)
 
-pem_priv_key = priv_key.private_bytes(
-    encoding, format, encryption_algorithm
-)
+pem_priv_key = priv_key.private_bytes(encoding, format, encryption_algorithm)
 ```
 
 You can deserialize a serialized PEM key with:
 ```python
 pub_key = load_pem_public_key(pem_pub_key)
 priv_key = load_pem_private_key(pem_priv_key, pwd)
-    
 ```
 
 ## RSA encryption/decryption (with padding)
+Use the preferred asymmetric `padder`, either [`PKCS1v15`](#pkcs1v15-padding-asymmetric) (RSA-PKCS1v15) or [`OAEP`](#oaep-padding-asymmetric) (RSA-OAEP).
 ```python
-padder = padding.PKSC1v15()
+# padder = padding.<padder>()
 
-ct = public_key.encrypt(message, padder)
-
-pt = public_key.decrypt(message, padder)
+ct = pub_key.encrypt(message, padder)  # public key of receiver
+pt = priv_key.decrypt(ct, padder)  # private key of receiver
 ```
 
-For OAEP padding, we need to set the padder as:
-```python
-from cryptography.hazmat.primitives import hashes
+Note that encrypting the same message won't give the same cyphertext when using `PKCS1v15` and `OAEP` padding, as there is a random bytes string appended.  
 
-padder = padding.OAEP(
-    mgf = padding.MGF1(
-        algorithms.hashes.SHA256()
-    ),
-    algorithm = hashes.SHA256(),
-    label = None
-)
-```
+Also note that you can't encrypt the same message twice, as the ciphertext resulting from the first encryption is too long for the second encryption.  
+The maximum message length with RSA2048-PKC1v15 is 246B, while with RSA2048-OAEP-SHA256 it's 191B.
 
-Note that encrypting the same message won't give the same cyphertext when using PKCS1v15 and OAEP padding, as there is a random bytes string appended.
 
-# Hybrid encryption (RSA OAEP + AES256-CTR)
-1. Encrypt the symmetric AES key with the public RSA key and add padding.
+# Hybrid encryption (RSA-OAEP + AES256-CTR)
+To encrypt:
+1. Encrypt the symmetric AES key with the public RSA key and add [`OAEP` padding](#oaep-padding-asymmetric).
     ```python
+    padder = padding.OAEP(mgf = padding.MGF1(algorithms.hashes.SHA256()), algorithm = hashes.SHA256(), label = None)
     encrypted_sym_key = pub_key.encrypt(key, padder)
     ```
 2. Generate a nonce.
     ```python
     nonce = os.urandom(BLOCK_SIZE)
     ```
-3. Encrypt with AES in CTR mode (see [AES256-CTR](#ctr-mode)).
+3. Encrypt with [AES-256](#aes-256) in [CTR mode](#ctr-mode).
 
 To decrypt: 
 1. Decrypt and unpad the AES key with the private RSA key.
     ```python
     key = priv_key.decrypt(encrypted_key, padder)
     ```
-2. Decrypt the cyphertext with AES in CTR mode (see [AES256-CTR](#ctr-mode)).
+2. Decrypt the cyphertext with [AES-256](#aes-256) in [CTR mode](#ctr-mode).
 
 
 # Key exchange
 
-## AES key wrapping
-Key wrapping is encrypting a symmetric key using another symmetric key in order to transmit it through an untrusted channel.
-
+## AES Key wrapping (symmetric)
 ```python
 from cryptography.hazmat.primitives.keywrap \
     import aes_key_wrap, aes_key_unwrap
-
+```
+You can use a symmetric key to wrap another symmetric key, in order to securely store the first one or transmit it over an untrusted channel.
+```python
+# wrapping
 wrapped_key = aes_key_wrap(wrapping_key, key)
-key = aes_key_unwrap(wrapping_key, wrapped_key)
+
+# unwrapping
+unwrapped_key = aes_key_unwrap(wrapping_key, wrapped_key)
 ```
 
 ## Diffie-Hellman
-1. Generate the parameters on both parties with the same generator and key size.
 ```python
 from cryptography.hazmat.primitives.asymmetric import dh
+```
+It's used to establish a **non-authenticated** shared key through an untrusted channel.
+For this implementation, we'll use the generator `2` and a key size of 2048b.
+```python
+GENERATOR = 2  # or 5
+KEY_SIZE = 2048  # bits
+```
+1. Generate the parameters on both parties with the same generator and key size.
 
-parameters = dh.generate_parameters(generator=2, key_size=2048)
-```
-2. Each party generates their private key
-```python
-server_priv_key = parameters.generate_private_key()
-host_priv_key = parameters.generate_private_key()
-```
-3. Each party computes their public key and shares it
-```python
-server_pub_key = parameters.generate_public_key()
-host_pub_key = parameters.generate_public_key()
-```
-4. Each party can now compute the shared key
-```python
-shared_key = server_priv_key.exchange(host_priv_key.public_key())
-shared_key = host_priv_key.exchange(server_priv_key.public_key())
-```
+    ```python
+    parameters = dh.generate_parameters(GENERATOR, KEY_SIZE)
+    ```
+2. Each party generates their private key.
+    ```python
+    server_priv_key = parameters.generate_private_key()
+    host_priv_key = parameters.generate_private_key()
+    ```
+3. Each party computes their public key and shares it.
+    ```python
+    server_pub_key = server_priv_key.public_key()
+    host_pub_key = host_priv_key.public_key()
+    ```
+4. Each party can now compute the shared key.
+    ```python
+    shared_key = server_priv_key.exchange(host_pub_key)
+    shared_key = host_priv_key.exchange(server_pub_key)
+    ```
 
 # Hash functions
 
 ## Message digests (SHA256/SHA512)
 ```python
 from cryptography.hazmat.primitives import hashes
-
+```
+```python
 digest = hashes.Hash(hashes.SHA512)
 digest.update(message)
 digest_value = digest.finalize()
@@ -311,11 +346,11 @@ Two different main goals:
 - **Cryptographic key derivation:** increase the quality of a key.
 
 ## Scrypt (Secure password storage)
-KDF designed for password storage. It needs randomly-generated salt.
 ```python
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-from cryptography.hazmat.primitives import hashes
-
+```
+KDF designed for password storage. It needs randomly-generated salt.
+```python
 kdf = Scrypt(
     salt = os.urandom(16),
     length = 32,  # e.g.
@@ -333,12 +368,12 @@ kdf.verify(password, key)
 ```
 
 ## PBKDF2 (Password-Based KDF 2)
-Used for **deriving a cryptographic key from a password**. It needs randomly-generated salt.
 ```python
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from cryptography.hazmat.primitives import hashes
-
+```
+Used for **deriving a cryptographic key from a password**. It needs randomly-generated salt.
+```python
 kdf = PKDF2HMAC(
     algorithm = hashes.SHA256(),
     length = 32,  # e.g.
@@ -358,12 +393,13 @@ kdf.verify(password, key)
 # Digital Signatures and Authentication
 
 ## Hash-Based Authentication Codes (HMAC)
+```python
+from cryptography.hazmat.primitives import hashes, hmac
+```
 The secret key should be a randomly generated string of bytes, preferably **of equal length to the digest size of the chosen hash function**.  
 
 To compute an authentication tag with HMAC:
 ```python
-from cryptography.hazmat.primitives import hashes, hmac
-
 hmac_key = os.urandom(hashes.SHA256.digest_size)
 h = hmac.HMAC(hmac_key, hashes.SHA256())
 h.update(message)
@@ -380,10 +416,11 @@ h_copy.verify(incorrect_signature)  # exception
 ```
 
 ## Cipher-Based Authentication Codes (CMAC)
-To compute an authentication tag with CMAC:
 ```python
 from cryptography.hazmat.primitives import hashes, cmac
-
+```
+To compute an authentication tag with CMAC:
+```python
 c = cmac.CMAC(algorithms.AES(key))
 c.update(message)
 signature = c.finalize()
@@ -398,12 +435,14 @@ h.verify(incorrect_signature)  # exception
 ```
 
 ## Fernet
-A symmetric encryption/decryption system using current best practices which also authenticates the message. Implemented with AES128-CBC and SHA256-HMAC.  
+```python
+from cryptography.fernet import Fernet
+```
+A symmetric encryption/decryption system using current best practices which also authenticates the message.  
+Implemented with AES128-CBC and SHA256-HMAC.  
 
 It uses a shared secret key that must be kept secure.
 ```python
-from cryptography.fernet import Fernet
-
 key = Fernet.generate_key()
 
 f = Fernet(key)
@@ -412,6 +451,9 @@ pt = f.decrypt(token)
 ```
 
 ## AES-GCM
+```python
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+```
 Implements authenticated encryption with aditional data (AEAD).  
 
 Input consists of:
@@ -419,8 +461,6 @@ Input consists of:
 - **Associated data:** will only be authenticated.
 
 ```python
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
 key = AESGCM.generate_key(128)
 aesgcm = AESGCM(key)
 nonce = os.urandom(12)
@@ -430,11 +470,12 @@ pt = aesgcm.decrypt(nonce, ct, ass_data)
 ```
 
 ## RSA signatures (RSA-PSS)
-Use private RSA key to sign, PSS padding (PKCS1v15 is also valid, but not reccomended), and SHA256 hash.
 ```python
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
-
+```
+Use private RSA key to sign, PSS padding (PKCS1v15 is also valid, but not reccomended), and SHA256 hash.
+```python
 signature = priv_key.sign(
     message,
     padding.PSS(mgf = padding.PSS.MAX_LENGTH),
@@ -490,7 +531,8 @@ AC2's certificate has been generated by AC1.
 ### Unserializing a PEM certificate
 ```python
 from cryptography import x509
-
+```
+```python
 certificate = x509.load_pem_x509_certificate(pemlines)
 ```
 `pemlines` is the `.pem` certificate.
@@ -511,7 +553,8 @@ Once serialized, we can access the certificate's:
 ```python
 from cryptography import x509
 from cryptography.hazmat.primitives import padding
-
+```
+```python
 pub_key_AC2 = x509.load_pem_x509_certificate(pem_pub_key_AC2)
 certificate_C = x509.load_pem_x509_certificate(pem_certificate_C)
 
