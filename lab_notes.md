@@ -19,9 +19,6 @@ bin_data = base64.b64decode(b64_data)
 ```
 
 # Padding
-```python
-from cryptography.hazmat.primitives import padding
-```
 The order of operation must always be:
 1. Pad data
 2. Encrypt padded data
@@ -29,30 +26,39 @@ The order of operation must always be:
 4. Decrypt encrypted data
 5. Unpad plaintext
 
-## PKCS7 padding (symmetric)
-Some block cyphers might require padding if the message is not a multiple of the block size. 
-```python
-BLOCK_SIZE = 16  # Bytes
+## Symmetric padding
+Some **block cyphers** might require padding if the message is not a multiple of the block size. 
 
+## PKCS7 padding
+```python
+from cryptography.hazmat.primitives import padding
+```
+```python
 padder = padding.PKCS7(BLOCK_SIZE * 8).padder()  # the padding is specified in bits
 padded_data = padder.update(data) + padder.finalize()
 
 unpadder = padding.PKCS7(BLOCK_SIZE * 8).unpadder()
 data = unpadder.update(padded_data) + unpadder.finalize()
-
 ```
 
-## PKCS1v15 padding (asymmetric)
+## Asymmetric padding (for RSA)
+Asymmetric padding is done not only because of the length of the message, but more importantly, because the security.
+
+### PKCS1v15 padding
+Used for **RSA signing and encryption**, but **not reccomended** for either (prefer [OAEP](#oaep-padding-asymmetric) for encryption and [PSS](#pss-padding-asymmetric) for signing).
+```python
+from cryptography.hazmat.primitives import padding
+```
 ```python
 padder = padding.PKCS1v15()
 ```
-Used for **RSA signing and encryption**, but **not reccomended** for either (prefer [OAEP](#oaep-padding-asymmetric) for encryption and [PSS](#pss-padding-asymmetric) for signing).
 
-## OAEP padding (asymmetric)
+
+### OAEP padding
 ```python
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import padding, hashes
 ```
-Used for **RSA encryption** (but not signing), and the **recommended method** to do so, at is has been proven secure.
+Used for **RSA encryption** (but not signing), and the **recommended method** to do so, as is has been proven secure.
 ```python
 padder = padding.OAEP(
     mgf = padding.MGF1(utils.hashes.SHA256()),
@@ -61,16 +67,15 @@ padder = padding.OAEP(
 )
 ```
 
-## PSS padding (asymmetric)
-Used for **RSA signing** (but not encryption), and the **recommended method** to do so, at is has been proven secure.
+### PSS padding
+Used for **RSA signing** (but not encryption), and the **recommended method** to do so, as is has been proven secure.
 ```python
-# for signing
-padder = padding.PSS(mgf = padding.PSS.MAX_LENGTH)
-
-# for verifying
-padder = padding.PSS(
-    mgf = padding.PSS.MAX_LENGTH,
-    salt_length = padding.PSS.MAX_LENGTH
+from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+```
+```python
+padder = asym_padding.PSS(
+    mgf = asym_padding.MGF1(hashes.SHA256()),
+    salt_length = asym_padding.PSS.MAX_LENGTH
 )
 ```
 
@@ -80,13 +85,16 @@ You can generate a random string of bytes by using an OS function, or a speciali
 
 ```python
 import os
-
+```
+```python
 rand = os.urandom(num_bytes)
 ```
 
 ```python
 import secrets
+```
 
+```python
 rand = secrets.token_bytes(num_bytes)
 ```
 
@@ -104,11 +112,11 @@ seq = L.runKCycle(num_bits)
 
 
 # Symmetric encryption
+The general syntax is:
+
 ```python
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 ```
-The general syntax is:
-
 ```python
 key = os.urandom(KEY_SIZE)
 iv = os.urandom(BLOCK_SIZE)  # if needed
@@ -185,7 +193,7 @@ cipher = Cipher(algorithms.ChaCha20(key, nonce), mode = None)
 ```
 
 
-# Assymetric encryption (RSA-2048)
+# Assymetric encryption - RSA-2048
 RSA-2048 uses a **2048b key**, and we'll use the public exponent as default (more info of why [here](https://www.youtube.com/watch?v=cbGB__V8MNk)). It **requires padding**.
 ```python
 KEY_SIZE = 2048  # bits
@@ -214,11 +222,11 @@ q = v.q
 ```
 
 ## PEM serialization
+To output the key pair in PEM format:
 ```python
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
 from cryptography.hazmat.primitives import serialization
 ```
-To output the key pair in PEM format:
 ```python
 encoding = serialization.Encoding.PEM
 
@@ -257,9 +265,9 @@ Also note that you can't encrypt the same message twice, as the ciphertext resul
 The maximum message length with RSA2048-PKC1v15 is 246B, while with RSA2048-OAEP-SHA256 it's 191B.
 
 
-# Hybrid encryption (RSA-OAEP + AES256-CTR)
+# Hybrid encryption - RSA-OAEP + AES256-CTR
 To encrypt:
-1. Encrypt the symmetric AES key with the public RSA key and add [`OAEP` padding](#oaep-padding-asymmetric).
+1. Encrypt the symmetric AES key with the public RSA key and add [OAEP padding](#oaep-padding-asymmetric).
     ```python
     padder = padding.OAEP(mgf = padding.MGF1(algorithms.hashes.SHA256()), algorithm = hashes.SHA256(), label = None)
     encrypted_sym_key = pub_key.encrypt(key, padder)
@@ -281,11 +289,11 @@ To decrypt:
 # Key exchange
 
 ## AES Key wrapping (symmetric)
+You can use a symmetric key to wrap another symmetric key, in order to securely store the first one or transmit it over an untrusted channel.
 ```python
 from cryptography.hazmat.primitives.keywrap \
     import aes_key_wrap, aes_key_unwrap
 ```
-You can use a symmetric key to wrap another symmetric key, in order to securely store the first one or transmit it over an untrusted channel.
 ```python
 # wrapping
 wrapped_key = aes_key_wrap(wrapping_key, key)
@@ -295,17 +303,16 @@ unwrapped_key = aes_key_unwrap(wrapping_key, wrapped_key)
 ```
 
 ## Diffie-Hellman
-```python
-from cryptography.hazmat.primitives.asymmetric import dh
-```
-It's used to establish a **non-authenticated** shared key through an untrusted channel.
+It's used to establish a **non-authenticated** shared key through an untrusted channel, but it's computationaly costly (slow).
 For this implementation, we'll use the generator `2` and a key size of 2048b.
 ```python
 GENERATOR = 2  # or 5
 KEY_SIZE = 2048  # bits
 ```
 1. Generate the parameters on both parties with the same generator and key size.
-
+    ```python
+    from cryptography.hazmat.primitives.asymmetric import dh
+    ```
     ```python
     parameters = dh.generate_parameters(GENERATOR, KEY_SIZE)
     ```
@@ -325,19 +332,75 @@ KEY_SIZE = 2048  # bits
     shared_key = host_priv_key.exchange(server_pub_key)
     ```
 
-# Hash functions
 
-## Message digests (SHA256/SHA512)
+# Message digests (Hash functions) - SHA512
+Takes an arbitrary size block of data and calculates a 64B (512b) bit string.  
+Digest values vary widely between similar inputs.  
 ```python
 from cryptography.hazmat.primitives import hashes
 ```
 ```python
-digest = hashes.Hash(hashes.SHA512)
+digest = hashes.Hash(hashes.SHA512())
 digest.update(message)
 digest_value = digest.finalize()
 ```
 
-Digest values vary widely between similar inputs.
+**Note:** Every time you need to compute a digest you need to create a `hash` object.
+
+
+# Message Authentication Codes (symmetric)
+
+## Hash-Based Authentication Codes (HMAC)
+The length of the MAC is the length of the hash used, e.g. with SHA256, the length is 32B.  
+The secret key should be a randomly generated string of bytes, **of equal length to the digest size of the chosen hash function**.  
+
+To compute an authentication tag with HMAC:
+```python
+from cryptography.hazmat.primitives import hashes, hmac
+```
+```python
+hmac_key = os.urandom(hashes.SHA256.digest_size)
+h = hmac.HMAC(hmac_key, hashes.SHA256())
+h.update(message)
+auth_tag = h.finalize
+```
+
+To verify the authentication tag:
+```python
+h = hmac.HMAC(hmac_key, hashes.SHA256())
+try:
+    h.update(message)
+    h.verify(auth_tag)
+    # the verification worked
+except InvalidSignature:
+    # the verification failed
+```
+
+## Cipher-Based Authentication Codes (CMAC)
+The length of the MAC is the length of the algorithm key length used, e.g. with AES128, the length is 16B.  
+The secret key should be a randomly generated string of bytes, **of equal length to the key size of the chosen algorithm**.  
+
+To compute an authentication tag with CMAC:
+```python
+from cryptography.hazmat.primitives import algorithms, cmac
+```
+```python
+cmac_key = os.urandom(algorithms.AES128.key_size)
+c = cmac.CMAC(algorithms.AES128(cmac_key))
+c.update(message)
+signature = c.finalize()
+```
+
+To verify the authentication tag:
+```python
+c = cmac.CMAC(algorithms.AES128(cmac_key))
+try:
+    c.update(message)
+    c.verify(auth_tag)
+    # the verification worked
+except InvalidSignature:
+    # the verification failed
+```
 
 
 # Key Derivation Functions (KDF)
@@ -346,14 +409,15 @@ Two different main goals:
 - **Cryptographic key derivation:** increase the quality of a key.
 
 ## Scrypt (Secure password storage)
+KDF designed for password storage. It needs a **16B randomly-generated salt**.
 ```python
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 ```
-KDF designed for password storage. It needs randomly-generated salt.
 ```python
+salt = os.urandom(16)
 kdf = Scrypt(
-    salt = os.urandom(16),
-    length = 32,  # e.g.
+    salt = salt,
+    length = 32,  # of the derived key
     n = 2**14,  # CPU/Mem cost
     r = 8,  # block size
     p = 1  # parallelization
@@ -364,138 +428,145 @@ key = kdf.derive(password)
 
 To verify it:
 ```python
-kdf.verify(password, key)
+try:
+    kdf = Scrypt(salt = salt, length = 32, n = 2**14, r = 8, p = 1)
+    kdf.verify(password, key)
+    # verification passed
+except InvalidKey:
+    # verification failed
 ```
 
+**Note:** You can't reuse KDFs.
+
+
 ## PBKDF2 (Password-Based KDF 2)
+Used for **deriving a cryptographic key from a password**. It needs a **16B randomly-generated salt**.
 ```python
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 ```
-Used for **deriving a cryptographic key from a password**. It needs randomly-generated salt.
 ```python
+salt = os.urandom(16)
 kdf = PKDF2HMAC(
     algorithm = hashes.SHA256(),
-    length = 32,  # e.g.
-    salt = os.urandom(16),
+    length = 32,  # of the desired key
+    salt = salt,
     iterations = 10000  # of the hash algorithm
 )
 
 key = kdf.derive(password)
 ```
 
-To verify it:
+To verify it (although it's not necessary if used for generating higher quality keys):
 ```python
-kdf.verify(password, key)
+try:
+    kdf = PKDF2HMAC(algorithm = hashes.SHA256(), length = 32, salt = os.urandom(16), iterations = 10000)
+    kdf.verify(password, key)
+    # verification passed
+except InvalidKey:
+    # verification failed
 ```
 
 
-# Digital Signatures and Authentication
-
-## Hash-Based Authentication Codes (HMAC)
-```python
-from cryptography.hazmat.primitives import hashes, hmac
-```
-The secret key should be a randomly generated string of bytes, preferably **of equal length to the digest size of the chosen hash function**.  
-
-To compute an authentication tag with HMAC:
-```python
-hmac_key = os.urandom(hashes.SHA256.digest_size)
-h = hmac.HMAC(hmac_key, hashes.SHA256())
-h.update(message)
-signature = h.finalize
-```
-
-To verify the authentication tag:
-```python
-h = hmac.HMAC(hmac_key, hashes.SHA256())
-h.update(message)
-h_copy = h.copy()
-h.verify(signature)
-h_copy.verify(incorrect_signature)  # exception
-```
-
-## Cipher-Based Authentication Codes (CMAC)
-```python
-from cryptography.hazmat.primitives import hashes, cmac
-```
-To compute an authentication tag with CMAC:
-```python
-c = cmac.CMAC(algorithms.AES(key))
-c.update(message)
-signature = c.finalize()
-```
-
-To verify the authentication tag:
-```python
-c = cmac.CMAC(algorithms.AES(key))
-c.update(message)
-h.verify(signature)
-h.verify(incorrect_signature)  # exception
-```
+# Authenticated Encryption (symmetric)
 
 ## Fernet
-```python
-from cryptography.fernet import Fernet
-```
 A symmetric encryption/decryption system using current best practices which also authenticates the message.  
 Implemented with AES128-CBC and SHA256-HMAC.  
 
-It uses a shared secret key that must be kept secure.
+It uses a shared secret key **in base64** that must be kept secure.  
+
+Tokens generated with the same key are similar, but different, as the IVs vary.  
+The token contains the HMAC authentication tag, several parameters (version, timestamp), the IV for CBC and the AES ciphertext.
+
+You can encrypt with:
+```python
+from cryptography.fernet import Fernet
+```
 ```python
 key = Fernet.generate_key()
 
 f = Fernet(key)
+
 token = f.encrypt(message)
-pt = f.decrypt(token)
 ```
 
-## AES-GCM
+Decryption also verifies the authenticity of the message:
 ```python
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+try:
+    pt = f.decrypt(token)
+    # verification successful
+except InvalidToken:
+    # verification failed
 ```
+
+
+## AES-GCM
 Implements authenticated encryption with aditional data (AEAD).  
 
 Input consists of:
 - **Plaintext:** will be encrypted and authenticated.
 - **Associated data:** will only be authenticated.
 
+Needs a nonce, but **never reuse a nonce with the same key**.
+
+You can encrypt with:
+```python
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+```
 ```python
 key = AESGCM.generate_key(128)
-aesgcm = AESGCM(key)
 nonce = os.urandom(12)
 
+aesgcm = AESGCM(key)
+
 ct = aesgcm.encrypt(nonce, data, ass_data)
-pt = aesgcm.decrypt(nonce, ct, ass_data)
 ```
 
-## RSA signatures (RSA-PSS)
+Decryption also verifies the authenticity of the message:
+```python
+try:
+    pt = aesgcm.decrypt(aesgcm_nonce, corrupted_tag, aad)
+    # verification successful
+except InvalidTag:
+    # verification failed
+```
+
+
+# RSA signatures - RSA-PSS-SHA256
+Use private RSA key to sign, PSS padding (PKCS1v15 is also valid, but not reccomended), and SHA256 hash.
 ```python
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives.asymmetric import padding as assym_padding
 ```
-Use private RSA key to sign, PSS padding (PKCS1v15 is also valid, but not reccomended), and SHA256 hash.
 ```python
 signature = priv_key.sign(
     message,
-    padding.PSS(mgf = padding.PSS.MAX_LENGTH),
+    assym_padding.PSS(
+        mgf = assym_padding.MGF1(hashes.SHA256()),
+        salt_length = assym_padding.PSS.MAX_LENGTH
+    ),
     hashes.SHA256()
 )
 ```
 Use the public key to verify the signature:
 ```python
-pub_key.verify(
-    signature,
-    message,
-    padding.PSS(
-        mgf = padding.PSS.MAX_LENGTH,
-        salt_length = padding.PSS.MAX_LENGTH
-    ),
-    hashes.SHA256()
-)
+try:
+    pub_key.verify(
+        signature,
+        message,
+        assym_padding.PSS(
+            mgf = assym_padding.MGF1(hashes.SHA256()),
+            salt_length = assym_padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    # verification successful
+except InvalidSignature:
+    # verification failed
 ```
 
-# Certificates (OpenSSL)
+# Certificates - OpenSSL
 
 ## Certificate generation
 ### Generating a keypair and a self-signed certificate

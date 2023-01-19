@@ -1,5 +1,5 @@
 # Cryptography labs
-By Luis Daniel Casais Mezquida & Javier Moreno Yébenes  
+By Luis Daniel Casais Mezquida  
 Cryptography 22/23  
 Bachelor's Degree in Applied Mathematics and Computing, grp. 121  
 Universidad Carlos III de Madrid
