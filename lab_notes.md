@@ -567,12 +567,12 @@ except InvalidSignature:
 
 ## Generating a keypair and a self-signed certificate
 ```bash
-openssl req -x509 -newkey rsa:2048 -days 360 -out ac1cert.pem -outform PEM -config .\openssl_AC1.cnf
+openssl req -x509 -newkey rsa:2048 -days 360 -out <ca_cert>.pem -outform PEM -config <ca_config>.cnf
 ```
 
 ## Printing a certificate
 ```bash
-openssl -x509 -in ac1cert.pem -text -noout
+openssl -x509 -in <ca_cert>.pem -text -noout
 ```
 
 ## Generating a certificate signing request (CSR)
@@ -586,28 +586,36 @@ csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
     x509.NameAttribute(NameOID.COMMON_NAME, u"Acsr"),
 ])).sign(load_pem_private_key(pem_priv_key, PASSWORD), hashes.SHA256())  # Sign the CSR with our private key
 ```
+You can then encode it in PEM format with:
+```python
+csr.public_bytes(serialization.Encoding.PEM)
+```
 If you save it in the corresponding certificate requests folder, you can check its contents with:
 ```bash
-openssl req -in ../AC1/solicitudes/Acsr.pem -text -noout
+openssl req -in <ca-requests-folder>/<usr_csr>.pem -text -noout
 ```
 
 ## Verifying requests
 ```bash
-openssl req -in ./solicitudes/Acsr.pem -verify -text -noout -config openssl_AC1.cnf
+openssl req -in <ca-requests-folder>/<usr_csr>.pem -verify -text -noout -config <ca_config>.cnf
 ```
 
 ## Issuing a public key certificate for an user
 ```bash
-openssl ca -in ./solicitudes/Acsr.pem -extensions usr_cert -notext -config openssl_AC1.cnf
+openssl ca -in <ca-requests-folder>/<usr_csr>.pem  -extensions usr_cert -notext -config <ca_config>.cnf
 ```
 
 ## Exporting a user certificate and and its certification chain
 ```bash
-openssl pkcs12 -export -in Acert.pem -inkey Akey.pem -certfile ac1cert.pem -out Acert_with_sk.p12
+openssl pkcs12 -export -in <usr_cert>.pem -inkey <usr_key>.pem -certfile <ca_cert>.pem -out Acert_with_sk.p12
 ```
 
 ## Retrieving data from certificates
-Once serialized, we can access the certificate's:
+You can deserialize a PEM certificate with:
+```python
+certificate = load_pem_x509_certificate(cert_pem)
+```
+Once deserialized, we can access the certificate's:
 - `version`
 - `serial_number`
 - `public_key()`
@@ -616,4 +624,3 @@ Once serialized, we can access the certificate's:
 - `signature_hash_algorithm`
 - `signature`
 - `tbs_certificate_bytes`
-- ...

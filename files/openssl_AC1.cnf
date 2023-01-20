@@ -42,12 +42,12 @@ database	= $dir/index.txt	# database index file.
 					# several ctificates with same subject.
 new_certs_dir	= $dir/nuevoscerts	# default place for new certs.
 
-certificate	= $dir/ac2cert.pem 	# The CA certificate
+certificate	= $dir/ac1cert.pem 	# The CA certificate
 serial		= $dir/serial 		# The current serial number
 #crlnumber	= $dir/crlnumber	# the current crl number
 					# must be commented out to leave a V1 CRL
-crl		= $dir/ca2crl.pem 		# The current CRL
-private_key	= $dir/privado/ca2key.pem # The private key
+crl		= $dir/ca1crl.pem 		# The current CRL
+private_key	= $dir/privado/ca1key.pem# The private key
 RANDFILE	= $dir/privado/.rand	# private random number file
 
 x509_extensions	= usr_cert		# The extentions to add to the cert
@@ -99,7 +99,7 @@ emailAddress		= optional
 ####################################################################
 [ req ]
 default_bits		= 2048
-default_keyfile 	= ./privado/ca2key.pem
+default_keyfile 	= ./privado/ca1key.pem
 default_md		= sha256	
 prompt			= no 
 distinguished_name	= req_distinguished_name
@@ -128,8 +128,8 @@ stateOrProvinceName		= MADRID
 organizationName		= UC3M
 organizationalUnitName		= INF
 
-commonName			= AC2
-emailAddress			= AC2@CRIPTO.INF.UC3M.ES
+commonName			= AC1
+emailAddress			= AC1@CRIPTO.INF.UC3M.ES
 
 # SET-ex3			= SET extension number 3
 
