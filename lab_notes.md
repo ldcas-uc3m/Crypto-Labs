@@ -47,6 +47,21 @@ seq = L.runKCycle(num_bits)
 ```
 
 
+# Message digests (Hash functions) - SHA512
+Takes an arbitrary size block of data and calculates a 64B (512b) bit string.  
+Digest values vary widely between similar inputs.  
+```python
+from cryptography.hazmat.primitives import hashes
+```
+```python
+digest = hashes.Hash(hashes.SHA512())
+digest.update(message)
+digest_value = digest.finalize()
+```
+
+**Note:** Every time you need to compute a digest you need to create a `hash` object.
+
+
 # Padding
 The order of operation must always be:
 1. Pad data
@@ -82,7 +97,7 @@ padder = padding.PKCS1v15()
 ```
 
 
-### OAEP padding
+### OAEP-SHA256 padding
 Used for **RSA encryption** (but not signing), and the **recommended method** to do so, as is has been proven secure.
 ```python
 from cryptography.hazmat.primitives import padding, hashes
@@ -95,7 +110,7 @@ padder = padding.OAEP(
 )
 ```
 
-### PSS padding
+### PSS-SHA256 padding
 Used for **RSA signing** (but not encryption), and the **recommended method** to do so, as is has been proven secure.
 ```python
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
@@ -145,7 +160,7 @@ cipher = Cipher(algorithms.AES256(key), mode = <mode>)
 
 
 ## Camellia-256
-It's a **block cypher** with **32B keys**, no padding required.
+It's a **block cypher** (with comparable security and performance to AES, but used) with **32B keys**.
 ```python
 KEY_SIZE = 32  # Bytes
 ```
@@ -169,7 +184,7 @@ cipher = Cipher(algorithms.AES256(key), modes.ECB())
 ```
 
 ### CTR mode
-Requires a nonce (unique and never reused). This mode is not reccomended for block cyphers with a block size of less than 128b.
+Requires a nonce (unique and never reused). This mode is not reccomended for block cyphers with a block size of less than 16B.
 ```python
 cipher = Cipher(algorithms.AES256(key), modes.CTR(nonce))
 ```
@@ -288,8 +303,7 @@ To decrypt:
 ## AES Key wrapping (symmetric)
 You can use a symmetric key to wrap another symmetric key, in order to securely store the first one or transmit it over an untrusted channel.
 ```python
-from cryptography.hazmat.primitives.keywrap \
-    import aes_key_wrap, aes_key_unwrap
+from cryptography.hazmat.primitives.keywrap import aes_key_wrap, aes_key_unwrap
 ```
 ```python
 # wrapping
@@ -330,26 +344,11 @@ KEY_SIZE = 2048  # bits
     ```
 
 
-# Message digests (Hash functions) - SHA512
-Takes an arbitrary size block of data and calculates a 64B (512b) bit string.  
-Digest values vary widely between similar inputs.  
-```python
-from cryptography.hazmat.primitives import hashes
-```
-```python
-digest = hashes.Hash(hashes.SHA512())
-digest.update(message)
-digest_value = digest.finalize()
-```
-
-**Note:** Every time you need to compute a digest you need to create a `hash` object.
-
-
 # Message Authentication Codes (symmetric)
 
 ## Hash-Based Authentication Codes (HMAC)
-The length of the MAC is the length of the hash used, e.g. with SHA256, the length is 32B.  
-The secret key should be a randomly generated string of bytes, **of equal length to the digest size of the chosen hash function**.  
+The **length of the MAC is the length of the hash used**, e.g. with SHA256, the length is 32B.  
+The **secret key** should be a randomly generated string of bytes, **of equal length to the digest size of the chosen hash function**.  
 
 To compute an authentication tag with HMAC:
 ```python
@@ -374,8 +373,8 @@ except InvalidSignature:
 ```
 
 ## Cipher-Based Authentication Codes (CMAC)
-The length of the MAC is the length of the algorithm key length used, e.g. with AES128, the length is 16B.  
-The secret key should be a randomly generated string of bytes, **of equal length to the key size of the chosen algorithm**.  
+The **length of the MAC is the length of the algorithm key length used**, e.g. with AES128, the length is 16B.  
+The **secret key** should be a randomly generated string of bytes, **of equal length to the key size of the chosen algorithm**.  
 
 To compute an authentication tag with CMAC:
 ```python
