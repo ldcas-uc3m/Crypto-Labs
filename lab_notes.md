@@ -573,14 +573,14 @@ except InvalidSignature:
 # Certificates - OpenSSL
 
 ## Deploying a self-signed Certification Authority (CA)
-1. Generate a keypair and a self-signed certificate
-    ```bash
-    openssl req -x509 -newkey rsa:2048 -days 360 -out <ca_cert>.pem -outform PEM -config <ca_config>.cnf
-    ```
-    You can print any certificate with:
-    ```bash
-    openssl -x509 -in <ca_cert>.pem -text -noout
-    ```
+Generate a keypair and a self-signed certificate (remember the password)
+```bash
+openssl req -x509 -newkey rsa:2048 -days 360 -out <ca_cert>.pem -outform PEM -config <ca_config>.cnf
+```
+You can print any certificate with:
+```bash
+openssl -x509 -in <ca_cert>.pem -text -noout
+```
 
 ## Generating an user certificate
 1. Create an RSA keypair for the user (see [RSA key generation](#rsa-key-generation))
