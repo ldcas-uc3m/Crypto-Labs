@@ -71,7 +71,9 @@ The order of operation must always be:
 5. Unpad plaintext
 
 ## Symmetric padding - PKCS7
-Some **block cyphers** might require padding if the message is not a multiple of the block size. 
+Some **block cyphers** might require padding if the message is not a multiple of the block size.  
+
+PCKCS7 is a standard padding method that appends `N` bytes (the ones required to complete the block) with the value of `chr(N)`.
 
 ```python
 from cryptography.hazmat.primitives import padding
@@ -172,19 +174,21 @@ cipher = Cipher(algorithms.Camellia(key), mode = <mode>)
 Block ciphers have different execution modes:
 
 ### CBC mode
-Needs an Initialization Vector (16B, same as the block size), and padding.
+Needs an **Initialization Vector** (16B, same as the block size), and padding.
 ```python
 cipher = Cipher(algorithms.AES256(key), modes.CBC(iv))
 ```
 
 ### ECB mode
-Padding is required.
+**Padding** is required.  
+
+Identical plaintext blocks will always result in identical ciphertext blocks (can leave significant patterns), so it's an **insecure mode**.
 ```python
 cipher = Cipher(algorithms.AES256(key), modes.ECB())
 ```
 
 ### CTR mode
-Requires a nonce (unique and never reused). This mode is not reccomended for block cyphers with a block size of less than 16B.
+Requires a **nonce** (16B, same as the block size), unique and **never reused**. This mode is **not reccomended for block cyphers with a block size of less than 16B**.
 ```python
 cipher = Cipher(algorithms.AES256(key), modes.CTR(nonce))
 ```
@@ -213,6 +217,7 @@ PUBLIC_EXPONENT = 65537
 ```
 
 ## RSA key generation
+You first generate the private key, and then you **derive the public key from the private key**.
 ```python
 from cryptography.hazmat.primitives.asymmetric import rsa
 ```
@@ -400,6 +405,7 @@ except InvalidSignature:
 
 
 # Key Derivation Functions (KDF)
+Key derivation functions derive bytes suitable for cryptographic operations from other data.  
 Two different main goals:
 - **Password storage:** conceal the real value of the password and hinder brute-force attacks.
 - **Cryptographic key derivation:** increase the quality of a key.
@@ -435,7 +441,7 @@ except InvalidKey:
 **Note:** You can't reuse KDFs.
 
 
-## PBKDF2 (Password-Based KDF 2)
+## PBKDF2-HMAC-SHA256 (Password-Based KDF 2)
 Used for **deriving a cryptographic key from a password**. It needs a **16B randomly-generated salt**.
 ```python
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -470,10 +476,10 @@ except InvalidKey:
 A symmetric encryption/decryption system using current best practices which also authenticates the message.  
 Implemented with AES128-CBC and SHA256-HMAC.  
 
-It uses a shared secret key **in base64** that must be kept secure.  
+It uses a shared secret key **in base64URL** that must be kept secure.  
 
 Tokens generated with the same key are similar, but different, as the IVs vary.  
-The token contains the HMAC authentication tag, several parameters (version, timestamp), the IV for CBC and the AES ciphertext.
+The token (in base64URL) contains the HMAC authentication tag, several parameters (version, timestamp), the IV for CBC and the AES ciphertext.
 
 You can encrypt with:
 ```python
@@ -497,8 +503,10 @@ except InvalidToken:
 ```
 
 
-## AES-GCM
+## AES128-GCM
 Implements authenticated encryption with aditional data (AEAD).  
+
+It requires a **128b** (16B) **key** and a **12B nonce**.
 
 Input consists of:
 - **Plaintext:** will be encrypted and authenticated.
@@ -564,50 +572,50 @@ except InvalidSignature:
 
 # Certificates - OpenSSL
 
-## Generating a keypair and a self-signed certificate
-```bash
-openssl req -x509 -newkey rsa:2048 -days 360 -out <ca_cert>.pem -outform PEM -config <ca_config>.cnf
-```
+## Deploying a self-signed Certification Authority (CA)
+1. Generate a keypair and a self-signed certificate
+    ```bash
+    openssl req -x509 -newkey rsa:2048 -days 360 -out <ca_cert>.pem -outform PEM -config <ca_config>.cnf
+    ```
+    You can print any certificate with:
+    ```bash
+    openssl -x509 -in <ca_cert>.pem -text -noout
+    ```
 
-## Printing a certificate
-```bash
-openssl -x509 -in <ca_cert>.pem -text -noout
-```
-
-## Generating a certificate signing request (CSR)
-```python
-csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
-    # Provide various details about who we are.
-    x509.NameAttribute(NameOID.COUNTRY_NAME, u"ES"),
-    x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"Madrid"),
-    x509.NameAttribute(NameOID.LOCALITY_NAME, u"Alcorcón"),
-    x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"UC3M"),
-    x509.NameAttribute(NameOID.COMMON_NAME, u"Acsr"),
-])).sign(load_pem_private_key(pem_priv_key, PASSWORD), hashes.SHA256())  # Sign the CSR with our private key
-```
-You can then encode it in PEM format with:
-```python
-csr.public_bytes(serialization.Encoding.PEM)
-```
-If you save it in the corresponding certificate requests folder, you can check its contents with:
-```bash
-openssl req -in <ca-requests-folder>/<usr_csr>.pem -text -noout
-```
-
-## Verifying requests
-```bash
-openssl req -in <ca-requests-folder>/<usr_csr>.pem -verify -text -noout -config <ca_config>.cnf
-```
-
-## Issuing a public key certificate for an user
-```bash
-openssl ca -in <ca-requests-folder>/<usr_csr>.pem  -extensions usr_cert -notext -config <ca_config>.cnf
-```
-
-## Exporting a user certificate and and its certification chain
-```bash
-openssl pkcs12 -export -in <usr_cert>.pem -inkey <usr_key>.pem -certfile <ca_cert>.pem -out Acert_with_sk.p12
-```
+## Generating an user certificate
+1. Create an RSA keypair for the user (see [RSA key generation](#rsa-key-generation))
+2. Generate a Certificate Signing Request (CSR)
+    ```python
+    csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
+        # Provide various details about who we are.
+        x509.NameAttribute(NameOID.COUNTRY_NAME, u"ES"),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"Madrid"),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, u"Alcorcón"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"UC3M"),
+        x509.NameAttribute(NameOID.COMMON_NAME, u"Acsr"),
+    ])).sign(load_pem_private_key(pem_priv_key, PASSWORD), hashes.SHA256())  # Sign the CSR with our private key
+    ```
+3. Encode the CSR in PEM format (remember the password)
+    ```python
+    csr.public_bytes(serialization.Encoding.PEM)
+    ```
+4. Send the CSR to the corresponding CA, e.g. saving it to the CA's `requests/` folder.  
+You can check the CSR contents with:
+    ```bash
+    openssl req -in <ca-requests-folder>/<usr_csr>.pem -text -noout
+    ```
+5. The CA verifies the requests
+    ```bash
+    openssl req -in <ca-requests-folder>/<usr_csr>.pem -verify -text -noout -config <ca_config>.cnf
+    ```
+6. The CA issues the PK certificate
+    ```bash
+    openssl ca -in <ca-requests-folder>/<usr_csr>.pem  -extensions usr_cert -notext -config <ca_config>.cnf
+    ```
+    You can export an user certificate and and its certification chain with:
+    ```bash
+    openssl pkcs12 -export -in <usr_cert>.pem -inkey <usr_key>.pem -certfile <ca_cert>.pem -out Acert_with_sk.p12
+    ```
 
 ## Retrieving data from certificates
 You can deserialize a PEM certificate with:
