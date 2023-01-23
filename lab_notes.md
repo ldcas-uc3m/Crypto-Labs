@@ -47,14 +47,14 @@ seq = L.runKCycle(num_bits)
 ```
 
 
-# Message digests (Hash functions) — SHA512
-Takes an arbitrary size block of data and calculates a 64B (512b) bit string.  
+# Message digests (Hash functions) — SHA256
+Takes an arbitrary size block of data and calculates a 32B (256b) bit string.  
 Digest values vary widely between similar inputs.  
 ```python
 from cryptography.hazmat.primitives import hashes
 ```
 ```python
-digest = hashes.Hash(hashes.SHA512())
+digest = hashes.Hash(hashes.SHA256())
 digest.update(message)
 digest_value = digest.finalize()
 ```
@@ -268,6 +268,7 @@ priv_key = load_pem_private_key(pem_priv_key, pwd)
 ```
 
 ## RSA encryption/decryption (with padding)
+Use the public key of the receiver to encrypt, and the receiver's private key to decrypt.  
 Use the preferred asymmetric padder, either [PKCS1v15](#pkcs1v15) (RSA-PKCS1v15) or [OAEP](#oaep-sha256) (RSA-OAEP).
 ```python
 # padder = padding.<padder>()
@@ -306,7 +307,7 @@ To decrypt:
 # Key exchange
 
 ## AES Key wrapping (symmetric)
-You can use a symmetric key to wrap another symmetric key, in order to securely store the first one or transmit it over an untrusted channel.
+You can use a symmetric key to encrypt another symmetric key, in order to securely store the first one or transmit it over an untrusted channel.
 ```python
 from cryptography.hazmat.primitives.keywrap import aes_key_wrap, aes_key_unwrap
 ```
@@ -538,7 +539,7 @@ except InvalidTag:
 
 
 # RSA signatures — RSA-PSS-SHA256
-Use private RSA key to sign, [PSS padding](#pss-sha256) (PKCS1v15 is also valid, but not reccomended), and SHA256 hash.
+Use private RSA key to sign, [PSS padding](#pss-sha256) (PKCS1v15 is also valid, but not reccomended), and [SHA256 hash](#message-digests-hash-functions--sha256).
 ```python
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding as assym_padding
@@ -553,7 +554,7 @@ signature = priv_key.sign(
     hashes.SHA256()
 )
 ```
-Use the public key to verify the signature:
+Use the signer's public key to verify the signature:
 ```python
 try:
     pub_key.verify(
@@ -573,7 +574,7 @@ except InvalidSignature:
 # Certificates — OpenSSL
 
 ## Deploying a self-signed Certification Authority (CA)
-Generate a keypair and a self-signed certificate (remember the password)
+Generate a keypair and a self-signed certificate (remember the password).
 ```bash
 openssl req -x509 -newkey rsa:2048 -days 360 -out <ca_cert>.pem -outform PEM -config <ca_config>.cnf
 ```
@@ -584,7 +585,7 @@ openssl -x509 -in <ca_cert>.pem -text -noout
 
 ## Generating a user certificate
 1. Create an RSA keypair for the user (see [RSA key generation](#rsa-key-generation))
-2. Generate a Certificate Signing Request (CSR)
+2. Generate a Certificate Signing Request (CSR) and sign it with the user's private key
     ```python
     csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([
         # Provide various details about who we are.
@@ -604,11 +605,11 @@ You can check the CSR contents with:
     ```bash
     openssl req -in <ca-requests-folder>/<usr_csr>.pem -text -noout
     ```
-5. The CA verifies the requests
+5. The CA verifies the request
     ```bash
     openssl req -in <ca-requests-folder>/<usr_csr>.pem -verify -text -noout -config <ca_config>.cnf
     ```
-6. The CA issues the PK certificate
+6. The CA issues the public key certificate
     ```bash
     openssl ca -in <ca-requests-folder>/<usr_csr>.pem  -extensions usr_cert -notext -config <ca_config>.cnf
     ```
