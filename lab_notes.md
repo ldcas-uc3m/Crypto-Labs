@@ -268,7 +268,7 @@ priv_key = load_pem_private_key(pem_priv_key, pwd)
 ```
 
 ## RSA encryption/decryption (with padding)
-Use the preferred asymmetric `padder`, either [PKCS1v15](#pkcs1v15-padding-asymmetric) (RSA-PKCS1v15) or [OAEP](#oaep-padding-asymmetric) (RSA-OAEP).
+Use the preferred asymmetric padder, either [PKCS1v15](#pkcs1v15) (RSA-PKCS1v15) or [OAEP](#oaep-sha256) (RSA-OAEP).
 ```python
 # padder = padding.<padder>()
 
@@ -282,9 +282,9 @@ Also note that you can't encrypt the same message twice, as the ciphertext resul
 The maximum message length with RSA2048-PKC1v15 is 246B, while with RSA2048-OAEP-SHA256 it's 191B.
 
 
-# Hybrid encryption — RSA-OAEP + AES256-CTR
+# Hybrid encryption — RSA2048-OAEP + AES256-CTR
 To encrypt:
-1. Encrypt the symmetric AES key with the public RSA key and add [OAEP padding](#oaep-padding-asymmetric).
+1. Encrypt the symmetric AES key with the public RSA key and add [OAEP padding](#oaep-sha256).
     ```python
     padder = padding.OAEP(mgf = padding.MGF1(algorithms.hashes.SHA256()), algorithm = hashes.SHA256(), label = None)
     encrypted_sym_key = pub_key.encrypt(key, padder)
@@ -538,7 +538,7 @@ except InvalidTag:
 
 
 # RSA signatures — RSA-PSS-SHA256
-Use private RSA key to sign, PSS padding (PKCS1v15 is also valid, but not reccomended), and SHA256 hash.
+Use private RSA key to sign, [PSS padding](#pss-sha256) (PKCS1v15 is also valid, but not reccomended), and SHA256 hash.
 ```python
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding as assym_padding
