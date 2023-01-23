@@ -47,7 +47,7 @@ seq = L.runKCycle(num_bits)
 ```
 
 
-# Message digests (Hash functions) - SHA512
+# Message digests (Hash functions) — SHA512
 Takes an arbitrary size block of data and calculates a 64B (512b) bit string.  
 Digest values vary widely between similar inputs.  
 ```python
@@ -70,7 +70,7 @@ The order of operation must always be:
 4. Decrypt encrypted data
 5. Unpad plaintext
 
-## Symmetric padding - PKCS7
+## Symmetric padding — PKCS7
 Some **block cyphers** might require padding if the message is not a multiple of the block size.  
 
 PCKCS7 is a standard padding method that appends `N` bytes (the ones required to complete the block) with the value of `chr(N)`.
@@ -89,8 +89,8 @@ data = unpadder.update(padded_data) + unpadder.finalize()
 ## Asymmetric padding (for RSA)
 Asymmetric padding is done not only because of the length of the message, but more importantly, because the security.
 
-### PKCS1v15 padding
-Used for **RSA signing and encryption**, but **not reccomended** for either (prefer [OAEP](#oaep-padding-asymmetric) for encryption and [PSS](#pss-padding-asymmetric) for signing).
+### PKCS1v15
+Used for **RSA signing and encryption**, but **not reccomended** for either (prefer [OAEP](#oaep-sha256) for encryption and [PSS](#pss-sha256) for signing).
 ```python
 from cryptography.hazmat.primitives import padding
 ```
@@ -99,7 +99,7 @@ padder = padding.PKCS1v15()
 ```
 
 
-### OAEP-SHA256 padding
+### OAEP-SHA256
 Used for **RSA encryption** (but not signing), and the **recommended method** to do so, as is has been proven secure.
 ```python
 from cryptography.hazmat.primitives import padding, hashes
@@ -112,7 +112,7 @@ padder = padding.OAEP(
 )
 ```
 
-### PSS-SHA256 padding
+### PSS-SHA256
 Used for **RSA signing** (but not encryption), and the **recommended method** to do so, as is has been proven secure.
 ```python
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
@@ -141,7 +141,7 @@ message = b"A secret message"  # must be binary
 cipher = Cipher(algorithm, mode)
 
 # encrypt
-encryptor = cyiher.encryptor()
+encryptor = cipher.encryptor()
 ct = encryptor.update(message) + encryptor.finalize()
 
 # decrypt
@@ -162,7 +162,7 @@ cipher = Cipher(algorithms.AES256(key), mode = <mode>)
 
 
 ## Camellia-256
-It's a **block cypher** (with comparable security and performance to AES, but used) with **32B keys**.
+It's a **block cypher** (with comparable security and performance to AES, but less used) with **32B keys**.
 ```python
 KEY_SIZE = 32  # Bytes
 ```
@@ -174,7 +174,7 @@ cipher = Cipher(algorithms.Camellia(key), mode = <mode>)
 Block ciphers have different execution modes:
 
 ### CBC mode
-Needs an **Initialization Vector** (16B, same as the block size), and padding.
+Needs an **Initialization Vector** (16B, same as the block size), and **padding**.
 ```python
 cipher = Cipher(algorithms.AES256(key), modes.CBC(iv))
 ```
@@ -209,7 +209,7 @@ cipher = Cipher(algorithms.ChaCha20(key, nonce), mode = None)
 ```
 
 
-# Assymetric encryption - RSA-2048
+# Assymetric encryption — RSA-2048
 RSA-2048 uses a **2048b key**, and we'll use the public exponent as default (more info of why [here](https://www.youtube.com/watch?v=cbGB__V8MNk)). It **requires padding**.
 ```python
 KEY_SIZE = 2048  # bits
@@ -282,7 +282,7 @@ Also note that you can't encrypt the same message twice, as the ciphertext resul
 The maximum message length with RSA2048-PKC1v15 is 246B, while with RSA2048-OAEP-SHA256 it's 191B.
 
 
-# Hybrid encryption - RSA-OAEP + AES256-CTR
+# Hybrid encryption — RSA-OAEP + AES256-CTR
 To encrypt:
 1. Encrypt the symmetric AES key with the public RSA key and add [OAEP padding](#oaep-padding-asymmetric).
     ```python
@@ -537,7 +537,7 @@ except InvalidTag:
 ```
 
 
-# RSA signatures - RSA-PSS-SHA256
+# RSA signatures — RSA-PSS-SHA256
 Use private RSA key to sign, PSS padding (PKCS1v15 is also valid, but not reccomended), and SHA256 hash.
 ```python
 from cryptography.hazmat.primitives import hashes
@@ -570,7 +570,7 @@ except InvalidSignature:
     # verification failed
 ```
 
-# Certificates - OpenSSL
+# Certificates — OpenSSL
 
 ## Deploying a self-signed Certification Authority (CA)
 Generate a keypair and a self-signed certificate (remember the password)
@@ -582,7 +582,7 @@ You can print any certificate with:
 openssl -x509 -in <ca_cert>.pem -text -noout
 ```
 
-## Generating an user certificate
+## Generating a user certificate
 1. Create an RSA keypair for the user (see [RSA key generation](#rsa-key-generation))
 2. Generate a Certificate Signing Request (CSR)
     ```python
@@ -612,7 +612,7 @@ You can check the CSR contents with:
     ```bash
     openssl ca -in <ca-requests-folder>/<usr_csr>.pem  -extensions usr_cert -notext -config <ca_config>.cnf
     ```
-    You can export an user certificate and and its certification chain with:
+    You can export a user certificate and and its certification chain with:
     ```bash
     openssl pkcs12 -export -in <usr_cert>.pem -inkey <usr_key>.pem -certfile <ca_cert>.pem -out Acert_with_sk.p12
     ```
